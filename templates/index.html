@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🚀 Full-Screen Crypto Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      background: linear-gradient(145deg, #1A1A1A 0%, #2A2A2A 100%);
+      position: relative;
+      min-height: 100vh;
+      margin: 0;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAMAAABHPGVmAAAAA1BMVEX///+nxBvIAAAAIElEQVR4nO3BgQAAAADDoPlT3+AAVqIQAAAC8ADwAADA4gGqYcE2rwAAAABJRU5ErkJggg==') repeat;
+      opacity: 0.05;
+      pointer-events: none;
+      z-index: -1;
+    }
+    .fullscreen-container {
+      background-color: #2A2A2A;
+      padding: 20px;
+      border-radius: 15px;
+    }
+    .header {
+      background-color: transparent;
+    }
+    .coin-info {
+      background-color: #25293b; /* Added to match the dark theme */
+      padding: 10px;
+      border-radius: 10px;
+    }
+    .info-card, .stat-card, .chart-container, .news-container, .crypto-box {
+      background: linear-gradient(145deg, #1e2a44 0%, #3b1e44 100%);
+      border: 1px solid #ffffff15;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+    }
+    .info-card {
+      padding: 25px;
+      border-radius: 12px;
+    }
+    .info-card h2 {
+      color: #ffffff;
+      text-shadow: 0 0 5px rgba(255,255,255,0.3);
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+    .info-card .price {
+      color: #00f0ff;
+      font-size: 32px;
+      font-weight: bold;
+      margin: 10px 0;
+      text-shadow: 0 0 8px rgba(0,240,255,0.5);
+    }
+    .info-card .change {
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .info-card .change.positive {
+      color: #00ff85;
+      text-shadow: 0 0 5px rgba(0,255,133,0.5);
+    }
+    .info-card .change.negative {
+      color: #ff3366;
+      text-shadow: 0 0 5px rgba(255,51,102,0.5);
+    }
+    .stat-card {
+      padding: 15px;
+      border-radius: 8px;
+    }
+    .stat-card .stat-label {
+      color: #cccccc;
+    }
+    .stat-card .stat-value {
+      color: #ffffff;
+    }
+    .chart-container {
+      padding: 15px;
+      border-radius: 10px;
+    }
+    .news-container {
+      padding: 15px;
+      border-radius: 10px;
+    }
+    .news-container a {
+      color: #ffffff;
+    }
+    .top-10-container {
+      margin-top: 20px;
+      background-color: transparent;
+    }
+    .crypto-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 20px;
+    }
+    .crypto-box {
+      padding: 15px;
+      border-radius: 15px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+      animation-delay: calc(var(--index) * 0.1s);
+    }
+    .crypto-box:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+    .crypto-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .crypto-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background-color: #555555;
+    }
+    .crypto-name {
+      font-size: 18px;
+      font-weight: bold;
+      margin: 0;
+      color: #ffffff;
+    }
+    .crypto-rank {
+      font-size: 14px;
+      color: #aaaaaa;
+    }
+    .crypto-price {
+      font-size: 16px;
+      font-weight: bold;
+      margin: 5px 0;
+      color: #00f0ff;
+      text-shadow: 0 0 5px rgba(0,240,255,0.3);
+    }
+    .crypto-change {
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    .crypto-change.positive {
+      color: #00ff85;
+      text-shadow: 0 0 5px rgba(0,255,133,0.3);
+    }
+    .crypto-change.negative {
+      color: #ff3366;
+      text-shadow: 0 0 5px rgba(255,51,102,0.3);
+    }
+    .crypto-chart {
+      height: 60px !important;
+      width: 100% !important;
+    }
+    h1, h2, h3 {
+      color: #ffffff;
+    }
+    p, a {
+      color: #cccccc;
+    }
+    .error {
+      color: #ff5555;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes drawLine {
+      from { stroke-dashoffset: 1000; }
+      to { stroke-dashoffset: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="fullscreen-container">
+    <div class="header">
+      <h1>Crypto Dashboard</h1>
+      <form method="POST">
+        <input type="text" name="coin" placeholder="e.g. ethereum" required>
+        <button type="submit">Fetch</button>
+      </form>
+    </div>
+
+    {% if error %}
+      <p class="error">{{ error }}</p>
+    {% endif %}
+
+    {% if coin %}
+      <div class="dashboard-grid">
+        <div class="coin-info">
+          <div class="info-card">
+            <h2>{{ coin.name }} ({{ coin.symbol }})</h2>
+            <div class="price">${{ "{:,.2f}".format(coin.price) }}</div>
+            <div class="change {% if coin.change_24h >= 0 %}positive{% else %}negative{% endif %}">
+              {{ "%.2f"|format(coin.change_24h) }}%
+            </div>
+          </div>
+          
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">Market Cap</div>
+              <div class="stat-value">${{ "{:,.2f}".format(coin.market_cap) }}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">24h High</div>
+              <div class="stat-value">${{ "{:,.2f}".format(coin.high_24h) }}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">24h Low</div>
+              <div class="stat-value">${{ "{:,.2f}".format(coin.low_24h) }}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Website</div>
+              <div class="stat-value"><a href="{{ coin.website }}" target="_blank">Visit</a></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <canvas id="priceChart"></canvas>
+        </div>
+
+        <div class="news-container">
+          <h3>Latest Crypto News</h3>
+          {% if news %}
+            <ul class="news-list">
+              {% for item in news %}
+                <li><a href="{{ item.link }}" target="_blank">{{ item.title }}</a></li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="error">Could not fetch news</p>
+          {% endif %}
+        </div>
+
+        {% if top_10_with_index %}
+        <div class="top-10-container">
+          <h2>Top 10 Cryptocurrencies</h2>
+          <div class="crypto-grid">
+            {% for crypto, index in top_10_with_index %}
+              <div class="crypto-box" style="--index: {{ index }}">
+                <div class="crypto-header">
+                  <div class="crypto-icon"></div>
+                  <div>
+                    <h3 class="crypto-name">{{ crypto['Name'] }}</h3>
+                    <span class="crypto-rank">MKT {{ crypto['Market Cap'] }} #{{ crypto['#'] }}</span>
+                  </div>
+                </div>
+                <div class="crypto-price">{{ crypto['Price'] }}</div>
+                <div class="crypto-change {% if crypto['24h %']|float >= 0 %}positive{% else %}negative{% endif %}">
+                  {{ crypto['24h %'] }}
+                </div>
+                <canvas class="crypto-chart" id="chart-{{ index }}"></canvas>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  {% if coin %}
+  <script>
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: {{ labels|tojson|safe }},
+        datasets: [{
+          data: {{ values|tojson|safe }},
+          borderColor: '#f2a900',
+          backgroundColor: 'rgba(242, 169, 0, 0.2)',
+          borderWidth: 3,
+          pointRadius: 4,
+          pointBackgroundColor: '#f2a900',
+          tension: 0.1,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: {
+            display: true,
+            text: '{{ coin.name }} 7-Day Price Chart (USD)',
+            font: { size: 22, weight: 'bold' },
+            padding: { top: 10, bottom: 20 },
+            color: '#ffffff'
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            titleFont: { size: 16 },
+            bodyFont: { size: 14 },
+            padding: 12,
+            cornerRadius: 8
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            ticks: {
+              font: { size: 16, weight: 'bold' },
+              color: '#cccccc',
+              callback: function(value) {
+                return '$' + value.toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                });
+              }
+            },
+            grid: { color: 'rgba(255,255,255,0.1)' }
+          },
+          x: {
+            ticks: { font: { size: 14 }, color: '#cccccc' },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  </script>
+  {% endif %}
+
+  {% if top_10_with_index %}
+  <script>
+    const mockData = Array(10).fill().map(() => Array(30).fill().map(() => Math.random() * 100));
+    
+    {% for index in range(10) %}
+      const ctx{{ index }} = document.getElementById('chart-{{ index }}').getContext('2d');
+      new Chart(ctx{{ index }}, {
+        type: 'line',
+        data: {
+          labels: Array(30).fill(''),
+          datasets: [{
+            data: mockData[{{ index }}],
+            borderColor: mockData[{{ index }}][29] > mockData[{{ index }}][0] ? '#28a745' : '#dc3545',
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.3,
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { enabled: false }
+          },
+          scales: {
+            x: { display: false },
+            y: { display: false }
+          },
+          animation: {
+            onComplete: function(animation) {
+              const chart = animation.chart;
+              const ctx = chart.ctx;
+              const dataset = chart.data.datasets[0];
+              const meta = chart.getDatasetMeta(0);
+              const path = meta.dataset._path;
+              ctx.save();
+              ctx.strokeStyle = dataset.borderColor;
+              ctx.lineWidth = dataset.borderWidth;
+              ctx.setLineDash([1000, 0]);
+              ctx.lineDashOffset = 1000;
+              ctx.stroke(path);
+              ctx.setLineDash([]);
+              ctx.stroke(path);
+              ctx.restore();
+            }
+          }
+        }
+      });
+    {% endfor %}
+  </script>
+  {% endif %}
+</body>
+</html>
