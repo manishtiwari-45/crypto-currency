@@ -49,3 +49,8 @@ If you're using Python 3.12, make sure to:
 
 ```bash
 pip install setuptools
+
+
+
+// to get latest commit 
+        ```git pull origin main```
