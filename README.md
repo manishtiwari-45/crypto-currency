@@ -53,4 +53,6 @@ pip install setuptools
 
 
 // to get latest commit 
-        ```git pull origin main```
+        ``` bash 
+        git pull origin main
+        ```
