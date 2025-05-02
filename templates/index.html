@@ -85,6 +85,8 @@
     .chart-container {
       padding: 15px;
       border-radius: 10px;
+      height: 230px;
+    position: relative;
     }
     .news-container {
       padding: 15px;
@@ -223,7 +225,12 @@
         </div>
 
         <div class="chart-container">
-          <canvas id="priceChart"></canvas>
+          <select id="timeRangeSelect" style="margin-bottom: 10px;">
+            <option value="30">1 Month</option>
+            <option value="180">6 Months</option>
+            <option value="365" selected>1 Year</option>
+          </select>
+          <canvas id="priceChart" height="180" style="width: 100%;"></canvas>
         </div>
 
         <div class="news-container">
@@ -269,7 +276,9 @@
   {% if coin %}
   <script>
     const ctx = document.getElementById('priceChart').getContext('2d');
-    new Chart(ctx, {
+    const coinName = '{{ coin.name }}';
+    const coinId = '{{ coin.id }}';
+    const priceChart = new Chart(ctx, {
       type: 'line',
       data: {
         labels: {{ labels|tojson|safe }},
@@ -278,8 +287,7 @@
           borderColor: '#f2a900',
           backgroundColor: 'rgba(242, 169, 0, 0.2)',
           borderWidth: 3,
-          pointRadius: 4,
-          pointBackgroundColor: '#f2a900',
+          pointRadius: 0,
           tension: 0.1,
           fill: true
         }]
@@ -291,7 +299,7 @@
           legend: { display: false },
           title: {
             display: true,
-            text: '{{ coin.name }} 7-Day Price Chart (USD)',
+            text: '{{ coin.name }} 1-Year Price Chart (USD)',
             font: { size: 22, weight: 'bold' },
             padding: { top: 10, bottom: 20 },
             color: '#ffffff'
@@ -325,6 +333,30 @@
           }
         }
       }
+    });
+
+    document.getElementById('timeRangeSelect').addEventListener('change', function() {
+      const days = this.value;
+      fetch(`/get_historical_data/${coinId}/${days}`)
+        .then(response => {
+          if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+          return response.json();
+        })
+        .then(data => {
+          if (data.labels && data.values) {
+            priceChart.data.labels = data.labels;
+            priceChart.data.datasets[0].data = data.values;
+            priceChart.options.plugins.title.text = `${coinName} ${days == 30 ? '1-Month' : days == 180 ? '6-Month' : '1-Year'} Price Chart (USD)`;
+            priceChart.update();
+          } else {
+            console.error('Invalid data received:', data);
+            alert('Failed to update chart data. Please try again.');
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching historical data:', error);
+          alert('Error fetching data. Check console for details.');
+        });
     });
   </script>
   {% endif %}
@@ -370,7 +402,7 @@
               ctx.strokeStyle = dataset.borderColor;
               ctx.lineWidth = dataset.borderWidth;
               ctx.setLineDash([1000, 0]);
-              ctx.lineDashOffset = 1000;
+              ctx.lineDashOffset: 1000;
               ctx.stroke(path);
               ctx.setLineDash([]);
               ctx.stroke(path);
@@ -382,5 +414,5 @@
     {% endfor %}
   </script>
   {% endif %}
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'935720c25c3dbfa2',t:'MTc0NTUxMzcyMy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>

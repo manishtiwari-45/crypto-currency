@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
@@ -34,6 +34,7 @@ def get_coin_data(coin_name):
         resp.raise_for_status()
         j = resp.json()
         return {
+            'id': j['id'],  # Add id for accurate API calls
             'name': j['name'],
             'symbol': j['symbol'].upper(),
             'price': j['market_data']['current_price']['usd'],
@@ -49,16 +50,15 @@ def get_coin_data(coin_name):
         print(f"Error fetching coin data: {e}")
         return None
 
-def get_historical_data(coin_name):
+def get_historical_data(coin_id, days=365):
     try:
-        resp = requests.get(f"{API_URL}coins/{coin_name.lower()}/market_chart",
-        
-                          params={'vs_currency':'usd','days':7},
+        resp = requests.get(f"{API_URL}coins/{coin_id.lower()}/market_chart",
+                          params={'vs_currency': 'usd', 'days': days},
                           headers=HEADERS)
         resp.raise_for_status()
         hist = resp.json()['prices']
-        labels = [datetime.fromtimestamp(ts/1000).strftime('%b %d') for ts,_ in hist]
-        values = [price for _,price in hist]
+        labels = [datetime.fromtimestamp(ts/1000).strftime('%b %d') for ts, _ in hist]
+        values = [price for _, price in hist]
         return labels, values
     except Exception as e:
         print(f"Error fetching historical data: {e}")
@@ -93,7 +93,7 @@ def scrape_crypto_news():
 
         if not news_items:
             feed = feedparser.parse("https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml")
-            news_items = [{'title':e.title,'link':e.link} for e in feed.entries[:6]]
+            news_items = [{'title': e.title, 'link': e.link} for e in feed.entries[:6]]
 
         return news_items
 
@@ -101,7 +101,7 @@ def scrape_crypto_news():
         print(f"Web scraping error: {e}")
         try:
             feed = feedparser.parse("https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml")
-            return [{'title':e.title,'link':e.link} for e in feed.entries[:6]]
+            return [{'title': e.title, 'link': e.link} for e in feed.entries[:6]]
         except:
             return []
 
@@ -112,13 +112,15 @@ def index():
     labels = []
     values = []
     news = scrape_crypto_news()
+    coin_id = None
 
     if request.method == "POST":
         coin_name = request.form["coin"].strip().lower()
         if coin_name:
             coin = get_coin_data(coin_name)
             if coin:
-                labels, values = get_historical_data(coin_name)
+                labels, values = get_historical_data(coin['id'], 365)
+                coin_id = coin['id']
             else:
                 error = "Coin not found or error fetching data."
         else:
@@ -127,7 +129,6 @@ def index():
     scraped_df = get_scraped_data()
     if scraped_df is not None:
         top_10 = scraped_df.head(10).to_dict('records')
-        # Zip the top_10 data with indices in Python
         top_10_with_index = list(zip(top_10, range(10)))
     else:
         top_10_with_index = []
@@ -139,8 +140,14 @@ def index():
         values=values,
         news=news,
         error=error,
-        top_10_with_index=top_10_with_index
+        top_10_with_index=top_10_with_index,
+        coin_id=coin_id
     )
+
+@app.route("/get_historical_data/<coin_id>/<int:days>", methods=["GET"])
+def get_historical_data_ajax(coin_id, days):
+    labels, values = get_historical_data(coin_id, days)
+    return jsonify({'labels': labels, 'values': values})
 
 if __name__ == "__main__":
     app.run(debug=True)
