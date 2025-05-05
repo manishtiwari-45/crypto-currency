@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Correlation Chart - Crypto Insights</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .navbar {
+            background: rgba(30, 30, 46, 0.95);
+            padding: 15px 30px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .navbar .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: #00f0ff;
+            text-decoration: none;
+        }
+        .navbar .nav-links {
+            display: flex;
+            gap: 20 Lucidlypx;
+        }
+        .navbar .nav-links a {
+            color: #e0e0e0;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 400;
+            transition: color 0.3s ease;
+        }
+        .navbar .nav-links a:hover {
+            color: #f2a900;
+        }
+        .container {
+            flex: 1;
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+        .footer {
+            background: rgba(30, 30, 46, 0.95);
+            padding: 15px;
+            text-align: center;
+            font-size: 14px;
+            color: #a0a0a0;
+            border-top: 1px solid #ffffff15;
+        }
+        .error {
+            color: #ff5555;
+            text-align: center;
+            padding: 15px;
+            background: #3a1e1e;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .back-button {
+            padding: 10px 20px;
+            background: #f2a900;
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+        .back-button:hover {
+            background: #e09900;
+        }
+        .chart-container {
+            background: rgba(50, 50, 70, 0.9);
+            border: 1px solid #ffffff15;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            height: 600px;
+            position: relative;
+        }
+        #correlationChart {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .debug {
+            color: #00ff85;
+            text-align: center;
+            padding: 10px;
+            background: #1e3a1e;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="logo">Crypto Insights</a>
+        <div class="nav-links">
+            <a href="/">Dashboard</a>
+            <a href="/sentiment_analysis">News & Sentiment</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="header">
+            <h1 id="chartTitle">Correlation Chart</h1>
+            <a href="/" class="back-button">Back to Dashboard</a>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+        <div id="debug" class="debug" style="display: none;"></div>
+        <div class="chart-container">
+            <canvas id="correlationChart"></canvas>
+        </div>
+    </div>
+
+    <footer class="footer">
+        © 2025 Crypto Insights. All rights reserved.
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@2.0.1/dist/chartjs-chart-matrix.min.js"></script>
+    <script>
+        function getCoinIdFromUrl() {
+            const path = window.location.pathname;
+            const parts = path.split('/');
+            return parts[parts.length - 1];
+        }
+
+        function fetchCorrelationData(coinId) {
+            fetch(`/api/correlation/${coinId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const errorDiv = document.getElementById('error');
+                    const debugDiv = document.getElementById('debug');
+                    const chartTitle = document.getElementById('chartTitle');
+                    const chartContainer = document.querySelector('.chart-container');
+
+                    if (data.error) {
+                        errorDiv.style.display = 'block';
+                        errorDiv.textContent = data.error;
+                        chartContainer.innerHTML = '<p class="error">No correlation data available.</p>';
+                        chartTitle.textContent = `Correlation Chart for ${coinId}`;
+                        return;
+                    }
+
+                    errorDiv.style.display = 'none';
+                    chartTitle.textContent = `Correlation Chart for ${data.coin.name || coinId}`;
+                    debugDiv.style.display = 'block';
+                    debugDiv.textContent = `Data received: ${data.matrix_data.length} entries, Labels: ${data.labels.length}`;
+
+                    try {
+                        const canvas = document.getElementById('correlationChart');
+                        if (!canvas) {
+                            throw new Error("Canvas element not found for correlationChart");
+                        }
+
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) {
+                            throw new Error("Canvas context not found for correlationChart");
+                        }
+
+                        if (typeof Chart === 'undefined') {
+                            throw new Error("Chart.js not loaded");
+                        }
+                        if (!Chart.controllers.matrix) {
+                            throw new Error("Chartjs-chart-matrix not loaded or incompatible with Chart.js");
+                        }
+
+                        setTimeout(() => {
+                            new Chart(ctx, {
+                                type: 'matrix',
+                                data: {
+                                    datasets: [{
+                                        label: 'Correlation Matrix',
+                                        data: data.matrix_data,
+                                        backgroundColor(c) {
+                                            const value = c.raw.v;
+                                            const alpha = (value + 1) / 2;
+                                            return `rgba(242, 169, 0, ${alpha})`;
+                                        },
+                                        borderColor: '#ffffff',
+                                        borderWidth: 1,
+                                        width: 40,
+                                        height: 40
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: { display: false },
+                                        title: {
+                                            display: true,
+                                            text: 'Correlation Matrix of Daily Returns (365 Days)',
+                                            font: { size: 22, weight: 'bold' },
+                                            color: '#ffffff',
+                                            padding: { top: 10, bottom: 20 }
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: function(context) {
+                                                    const v = context.raw.v;
+                                                    const x = context.raw.x;
+                                                    const y = context.raw.y;
+                                                    return `${x} vs ${y}: ${v.toFixed(2)}`;
+                                                }
+                                            }
+                                        }
+                                    },
+                                    scales: {
+                                        x: {
+                                            type: 'category',
+                                            labels: data.labels,
+                                            ticks: {
+                                                color: '#cccccc',
+                                                font: { size: 12 },
+                                                autoSkip: false,
+                                                maxRotation: 45,
+                                                minRotation: 45
+                                            },
+                                            grid: { display: false }
+                                        },
+                                        y: {
+                                            type: 'category',
+                                            labels: data.labels,
+                                            ticks: { color: '#cccccc', font: { size: 12 } },
+                                            grid: { display: false }
+                                        }
+                                    }
+                                }
+                            });
+                        }, 100);
+                    } catch (error) {
+                        console.error("Error rendering correlation chart:", error);
+                        chartContainer.innerHTML = `<p class="error">Failed to render chart. Check console for details: ${error.message}</p>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching correlation data:', error);
+                    document.getElementById('error').style.display = 'block';
+                    document.getElementById('error').textContent = 'Failed to fetch correlation data.';
+                    document.querySelector('.chart-container').innerHTML = '<p class="error">No correlation data available.</p>';
+                });
+        }
+
+        window.onload = () => {
+            const coinId = getCoinIdFromUrl();
+            fetchCorrelationData(coinId);
+        };
+    </script>
+</body>
+</html>

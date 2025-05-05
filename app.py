@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, jsonify, request, send_from_directory
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
@@ -8,8 +8,9 @@ import numpy as np
 import logging
 from textblob import TextBlob
 import nltk
+import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 API_URL = "https://api.coingecko.com/api/v3/"
 API_KEY = "CG-4XuW8PMezjUirbVrSiZ7RK5Z"
 
@@ -436,126 +437,130 @@ def analyze_sentiment_impact(news_items):
         'summary': summary
     }
 
-@app.route("/", methods=["GET", "POST"])
+@app.route('/')
 def index():
+    return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/sentiment_analysis')
+def sentiment_analysis():
+    return send_from_directory(app.static_folder, 'sentiment_analysis.html')
+
+@app.route('/correlation/<coin_id>')
+def correlation(coin_id):
+    return send_from_directory(app.static_folder, 'correlation.html')
+
+@app.route('/dashboard')
+def dashboard():
+    return send_from_directory(app.static_folder, 'dashboard.html')
+
+@app.route('/api/coin', methods=['POST'])
+def api_coin():
+    coin_name = request.form.get('coin', '').strip().lower()
+    if not coin_name:
+        return jsonify({'error': 'Please enter a coin name'}), 400
+    
+    coin_id = COIN_ID_MAPPING.get(coin_name, coin_name)
     coin = None
-    error = None
     labels = []
     values = []
-    coin_id = None
     final_portfolio_value = None
     max_drawdown = None
     ier = None
     ier_error = None
-    sim_final_value = None
-    sim_profit_loss = None
-    sim_profit_loss_percent = None
-    sim_error = None
-    sim_start_date = None
-    sim_amount = None
-    sim_type = None
-
-    if request.method == "POST":
-        coin_name = request.form["coin"].strip().lower()
-        coin_id = COIN_ID_MAPPING.get(coin_name, coin_name)
-        if coin_name:
-            if not csv_data.empty and coin_name.upper() in csv_data['symbol'].values:
-                symbol = coin_name.upper()
-                labels, values = get_historical_data_from_csv(symbol, 365)
-                coin_id = get_coin_id_from_symbol(symbol) or symbol
-                if labels and values:
-                    coin = {
-                        'id': coin_id,
-                        'name': csv_data[csv_data['symbol'] == symbol]['name'].iloc[0],
-                        'symbol': symbol,
-                        'price': csv_data[csv_data['symbol'] == symbol]['price'].iloc[-1],
-                        'market_cap': csv_data[csv_data['symbol'] == symbol]['market_cap'].iloc[-1],
-                        'change_24h': csv_data[csv_data['symbol'] == symbol]['percent_change_24h'].iloc[-1],
-                        'high_24h': csv_data[csv_data['symbol'] == symbol]['price'].max(),
-                        'low_24h': csv_data[csv_data['symbol'] == symbol]['price'].min(),
-                        'tags': [],
-                        'website': '',
-                        'description': ''
-                    }
-                    final_portfolio_value, max_drawdown, ier, ier_error = calculate_ier(values)
-                else:
-                    error = "No historical data found in CSV for this coin."
-            else:
-                coin = get_coin_data(coin_id)
-                if coin:
-                    labels, values = get_historical_data(coin['id'], 365)
-                    coin_id = coin['id']
-                    final_portfolio_value, max_drawdown, ier, ier_error = calculate_ier(values)
-                else:
-                    error = f"Could not fetch data for '{coin_name}'. Please check the name and try again."
-            
-            if "investment_date" in request.form and "investment_amount" in request.form:
-                sim_start_date = request.form["investment_date"]
-                sim_amount = request.form["investment_amount"]
-                sim_type = request.form.get("investment_type", "lump_sum")
-                if coin_id:
-                    sim_final_value, sim_profit_loss, sim_profit_loss_percent, sim_error = calculate_investment_simulation(
-                        coin_id, sim_start_date, sim_amount, sim_type
-                    )
+    
+    if not csv_data.empty and coin_name.upper() in csv_data['symbol'].values:
+        symbol = coin_name.upper()
+        labels, values = get_historical_data_from_csv(symbol, 365)
+        coin_id = get_coin_id_from_symbol(symbol) or symbol
+        if labels and values:
+            coin = {
+                'id': coin_id,
+                'name': csv_data[csv_data['symbol'] == symbol]['name'].iloc[0],
+                'symbol': symbol,
+                'price': csv_data[csv_data['symbol'] == symbol]['price'].iloc[-1],
+                'market_cap': csv_data[csv_data['symbol'] == symbol]['market_cap'].iloc[-1],
+                'change_24h': csv_data[csv_data['symbol'] == symbol]['percent_change_24h'].iloc[-1],
+                'high_24h': csv_data[csv_data['symbol'] == symbol]['price'].max(),
+                'low_24h': csv_data[csv_data['symbol'] == symbol]['price'].min(),
+                'tags': [],
+                'website': '',
+                'description': ''
+            }
+            final_portfolio_value, max_drawdown, ier, ier_error = calculate_ier(values)
         else:
-            error = "Please enter a coin name"
+            return jsonify({'error': 'No historical data found in CSV for this coin.'}), 404
+    else:
+        coin = get_coin_data(coin_id)
+        if coin:
+            labels, values = get_historical_data(coin['id'], 365)
+            coin_id = coin['id']
+            final_portfolio_value, max_drawdown, ier, ier_error = calculate_ier(values)
+        else:
+            return jsonify({'error': f"Could not fetch data for '{coin_name}'. Please check the name and try again."}), 404
+    
+    response = {
+        'coin': coin,
+        'labels': labels,
+        'values': values,
+        'coin_id': coin_id,
+        'final_portfolio_value': final_portfolio_value,
+        'max_drawdown': max_drawdown,
+        'ier': ier,
+        'ier_error': ier_error
+    }
+    
+    if 'investment_date' in request.form and 'investment_amount' in request.form:
+        sim_start_date = request.form['investment_date']
+        sim_amount = request.form['investment_amount']
+        sim_type = request.form.get('investment_type', 'lump_sum')
+        sim_final_value, sim_profit_loss, sim_profit_loss_percent, sim_error = calculate_investment_simulation(
+            coin_id, sim_start_date, sim_amount, sim_type
+        )
+        response.update({
+            'sim_final_value': sim_final_value,
+            'sim_profit_loss': sim_profit_loss,
+            'sim_profit_loss_percent': sim_profit_loss_percent,
+            'sim_error': sim_error,
+            'sim_start_date': sim_start_date,
+            'sim_amount': sim_amount,
+            'sim_type': sim_type
+        })
+    
+    return jsonify(response)
 
-    return render_template(
-        "index.html",
-        coin=coin,
-        labels=labels,
-        values=values,
-        error=error,
-        coin_id=coin_id,
-        final_portfolio_value=final_portfolio_value,
-        max_drawdown=max_drawdown,
-        ier=ier,
-        ier_error=ier_error,
-        sim_final_value=sim_final_value,
-        sim_profit_loss=sim_profit_loss,
-        sim_profit_loss_percent=sim_profit_loss_percent,
-        sim_error=sim_error,
-        sim_start_date=sim_start_date,
-        sim_amount=sim_amount,
-        sim_type=sim_type
-    )
-
-@app.route("/sentiment_analysis")
-def sentiment_analysis():
+@app.route('/api/sentiment_analysis', methods=['GET'])
+def api_sentiment_analysis():
     news_items = scrape_crypto_news()
     if not news_items:
-        error = "Could not fetch news for sentiment analysis."
-        return render_template("sentiment_analysis.html", error=error)
+        return jsonify({'error': 'Could not fetch news for sentiment analysis.'}), 500
     
     analysis = analyze_sentiment_impact(news_items)
-    return render_template(
-        "sentiment_analysis.html",
-        news_items=news_items,
-        sentiment_counts=analysis['sentiment_counts'],
-        avg_polarity=analysis['avg_polarity'],
-        sentiment_trend=analysis['sentiment_trend'],
-        investor_impact=analysis['investor_impact'],
-        price_hype=analysis['price_hype'],
-        summary=analysis['summary']
-    )
+    return jsonify({
+        'news_items': news_items,
+        'sentiment_counts': analysis['sentiment_counts'],
+        'avg_polarity': analysis['avg_polarity'],
+        'sentiment_trend': analysis['sentiment_trend'],
+        'investor_impact': analysis['investor_impact'],
+        'price_hype': analysis['price_hype'],
+        'summary': analysis['summary']
+    })
 
-@app.route("/correlation/<coin_id>")
-def correlation(coin_id):
+@app.route('/api/correlation/<coin_id>', methods=['GET'])
+def api_correlation(coin_id):
     coin = get_coin_data(coin_id)
     if not coin:
-        return render_template("correlation.html", error=f"Could not fetch data for coin ID: {coin_id}", coin_id=coin_id)
+        return jsonify({'error': f'Could not fetch data for coin ID: {coin_id}'}), 404
     
     matrix_data, labels, error = calculate_correlation_data(coin_id)
-    return render_template(
-        "correlation.html",
-        coin=coin,
-        matrix_data=matrix_data,
-        labels=labels,
-        error=error
-    )
+    return jsonify({
+        'coin': coin,
+        'matrix_data': matrix_data,
+        'labels': labels,
+        'error': error
+    })
 
-@app.route("/get_top_10", methods=["GET"])
-def get_top_10():
+@app.route('/api/top_10', methods=['GET'])
+def api_top_10():
     top_10_df = get_scraped_data()
     if top_10_df is not None:
         top_10 = top_10_df.to_dict('records')
@@ -572,37 +577,37 @@ def get_top_10():
         } for crypto, idx in top_10_with_index])
     return jsonify({'error': 'Could not fetch top 10 data'}), 500
 
-@app.route("/get_news", methods=["GET"])
-def get_news():
+@app.route('/api/news', methods=['GET'])
+def api_news():
     news = scrape_crypto_news()
     if news:
         return jsonify(news)
     return jsonify({'error': 'Could not fetch news'}), 500
 
-@app.route("/get_historical_data/<coin_id>/<int:days>", methods=["GET"])
-def get_historical_data_ajax(coin_id, days):
+@app.route('/api/historical_data/<coin_id>/<int:days>', methods=['GET'])
+def api_historical_data(coin_id, days):
     try:
         labels, values = [], []
-        source = "unknown"
+        source = 'unknown'
         if coin_id in csv_data['symbol'].values:
             labels, values = get_historical_data_from_csv(coin_id, days)
-            source = "CSV"
+            source = 'CSV'
         if not labels or not values:
             actual_coin_id = get_coin_id_from_symbol(coin_id) if coin_id in csv_data['symbol'].values else coin_id
             if actual_coin_id:
                 labels, values = get_historical_data(actual_coin_id, days)
-                source = "API"
+                source = 'API'
             else:
-                logger.error(f"Invalid coin ID or symbol: {coin_id}")
+                logger.error(f'Invalid coin ID or symbol: {coin_id}')
                 return jsonify({'error': f'Invalid coin ID or symbol: {coin_id}'}), 404
         if not labels or not values:
-            logger.warning(f"No data available for {coin_id}, {days} days from {source}")
+            logger.warning(f'No data available for {coin_id}, {days} days from {source}')
             return jsonify({'error': f'No data available for {coin_id} for {days} days'}), 404
-        logger.info(f"Returning data for {coin_id}, {days} days from {source}")
+        logger.info(f'Returning data for {coin_id}, {days} days from {source}')
         return jsonify({'labels': labels, 'values': values})
     except Exception as e:
-        logger.error(f"Error in get_historical_data_ajax for {coin_id}, {days} days: {e}")
+        logger.error(f'Error in api_historical_data for {coin_id}, {days} days: {e}')
         return jsonify({'error': 'Failed to fetch historical data'}), 500
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True)

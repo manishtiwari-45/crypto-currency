@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News & Sentiment Analysis - Crypto Insights</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .navbar {
+            background: rgba(30, 30, 46, 0.95);
+            padding: 15px 30px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .navbar .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: #00f0ff;
+            text-decoration: none;
+        }
+        .navbar .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        .navbar .nav-links a {
+            color: #e0e0e0;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 400;
+            transition: color 0.3s ease;
+        }
+        .navbar .nav-links a:hover {
+            color: #f2a900;
+        }
+        .container {
+            flex: 1;
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+        .footer {
+            background: rgba(30, 30, 46, 0.95);
+            padding: 15px;
+            text-align: center;
+            font-size: 14px;
+            color: #a0a0a0;
+            border-top: 1px solid #ffffff15;
+        }
+        .error {
+            color: #ff5555;
+            text-align: center;
+            padding: 15px;
+            background: #3a1e1e;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .sentiment-container {
+            background: rgba(30, 30, 46, 0.8);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #ffffff15;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .back-button {
+            padding: 10px 20px;
+            background: #f2a900;
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+        .back-button:hover {
+            background: #e09900;
+        }
+        .sentiment-summary {
+            background: rgba(50, 50, 70, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+        .sentiment-summary div {
+            flex: 1;
+        }
+        .sentiment-summary .label {
+            font-size: 16px;
+            color: #a0a0a0;
+            margin-bottom: 5px;
+        }
+        .sentiment-summary .value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .sentiment-summary .positive {
+            color: #00ff85;
+        }
+        .sentiment-summary .negative {
+            color: #ff3366;
+        }
+        .sentiment-summary .neutral {
+            color: #f2a900;
+        }
+        .chart-container {
+            background: rgba(50, 50, 70, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .chart-container h3 {
+            color: #ffffff;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .chart-container canvas {
+            width: 100% !important;
+            height: 300px !important;
+        }
+        .insights-container {
+            background: rgba(50, 50, 70, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .insights-container h3 {
+            color: #ffffff;
+            font-size: 22px;
+            margin-bottom: 15px;
+        }
+        .insights-container p {
+            font-size: 16px;
+            color: #a0a0a0;
+            margin: 10px 0;
+        }
+        .insights-container .highlight {
+            color: #f2a900;
+            font-weight: bold;
+        }
+        .news-list-container {
+            background: rgba(50, 50, 70, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .news-list-container h2 {
+            color: #ffffff;
+            font-size: 22px;
+            margin-bottom: 15px;
+        }
+        .news-list {
+            list-style: none;
+        }
+        .news-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #ffffff15;
+        }
+        .news-item:last-child {
+            border-bottom: none;
+        }
+        .news-title a {
+            color: #e0e0e0;
+            text-decoration: none;
+            font-size: 16px;
+            transition: color 0.3s ease;
+        }
+        .news-title a:hover {
+            color: #f2a900;
+        }
+        .sentiment-info {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .sentiment-label {
+            font-size: 14px;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 5px;
+            text-transform: capitalize;
+        }
+        .sentiment-label.positive {
+            background: #00ff8520;
+            color: #00ff85;
+        }
+        .sentiment-label.negative {
+            background: #ff336620;
+            color: #ff3366;
+        }
+        .sentiment-label.neutral {
+            background: #f2a90020;
+            color: #f2a900;
+        }
+        .sentiment-score {
+            font-size: 14px;
+            color: #a0a0a0;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #f2a900;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="logo">Crypto Insights</a>
+        <div class="nav-links">
+            <a href="/">Dashboard</a>
+            <a href="/sentiment_analysis">News & Sentiment</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="sentiment-container">
+            <div class="header">
+                <h1>News & Sentiment Analysis</h1>
+                <a href="/" class="back-button">Back to Dashboard</a>
+            </div>
+
+            <div id="error" class="error" style="display: none;"></div>
+            <div id="loading" class="loading">Loading sentiment data...</div>
+            <div id="sentimentContent" style="display: none;"></div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        © 2025 Crypto Insights. All rights reserved.
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script>
+        function fetchSentimentData() {
+            const loadingDiv = document.getElementById('loading');
+            const errorDiv = document.getElementById('error');
+            const sentimentContent = document.getElementById('sentimentContent');
+
+            fetch('/api/sentiment_analysis')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Sentiment Data:', data); // Debug: Log the response
+
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+
+                    // Hide loading, show content
+                    loadingDiv.style.display = 'none';
+                    errorDiv.style.display = 'none';
+                    sentimentContent.style.display = 'block';
+
+                    // Render the content
+                    sentimentContent.innerHTML = `
+                        <div class="sentiment-summary">
+                            <div>
+                                <div class="label">Positive</div>
+                                <div class="value positive">${data.sentiment_counts.positive}</div>
+                            </div>
+                            <div>
+                                <div class="label">Negative</div>
+                                <div class="value negative">${data.sentiment_counts.negative}</div>
+                            </div>
+                            <div>
+                                <div class="label">Neutral</div>
+                                <div class="value neutral">${data.sentiment_counts.neutral}</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <h3>Sentiment Distribution</h3>
+                            <canvas id="sentimentPieChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>Investor Impact Analysis</h3>
+                            <canvas id="investorImpactChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>Price Hype Trend</h3>
+                            <canvas id="priceHypeChart"></canvas>
+                        </div>
+                        <div class="insights-container">
+                            <h3>Market Insights</h3>
+                            <p>Average Sentiment Score: <span class="highlight">${data.avg_polarity}</span></p>
+                            <p>${data.summary}</p>
+                        </div>
+                        <div class="news-list-container">
+                            <h2>Latest Crypto News Headlines</h2>
+                            <ul class="news-list">
+                                ${data.news_items.map(item => `
+                                    <li class="news-item">
+                                        <div class="news-title">
+                                            <a href="${item.link}" target="_blank">${item.title}</a>
+                                        </div>
+                                        <div class="sentiment-info">
+                                            <span class="sentiment-label ${item.sentiment}">${item.sentiment}</span>
+                                            <span class="sentiment-score">Score: ${item.polarity}</span>
+                                        </div>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    `;
+
+                    // Sentiment Distribution Pie Chart
+                    const sentimentPieCtx = document.getElementById('sentimentPieChart').getContext('2d');
+                    new Chart(sentimentPieCtx, {
+                        type: 'pie',
+                        data: {
+                            labels: ['Positive', 'Negative', 'Neutral'],
+                            datasets: [{
+                                data: [data.sentiment_counts.positive, data.sentiment_counts.negative, data.sentiment_counts.neutral],
+                                backgroundColor: ['#00ff85', '#ff3366', '#f2a900'],
+                                borderWidth: 1,
+                                borderColor: '#ffffff'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: { color: '#e0e0e0', font: { size: 14 } }
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Sentiment Distribution of Latest News',
+                                    font: { size: 18, weight: 'bold' },
+                                    color: '#ffffff',
+                                    padding: { bottom: 20 }
+                                }
+                            }
+                        }
+                    });
+
+                    // Investor Impact Bar Chart
+                    const investorImpactCtx = document.getElementById('investorImpactChart').getContext('2d');
+                    new Chart(investorImpactCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Confidence', 'Risk', 'Stability'],
+                            datasets: [{
+                                label: 'Impact Score',
+                                data: [
+                                    data.investor_impact.confidence,
+                                    data.investor_impact.risk,
+                                    data.investor_impact.stability
+                                ],
+                                backgroundColor: ['#00ff85', '#ff3366', '#f2a900'],
+                                borderWidth: 1,
+                                borderColor: '#ffffff'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                title: {
+                                    display: true,
+                                    text: 'Potential Impact on Investors',
+                                    font: { size: 18, weight: 'bold' },
+                                    color: '#ffffff',
+                                    padding: { bottom: 20 }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `${context.label}: ${context.raw} points`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { color: '#cccccc', font: { size: 12 } },
+                                    grid: { color: 'rgba(255,255,255,0.1)' }
+                                },
+                                x: {
+                                    ticks: { color: '#cccccc', font: { size: 12 } },
+                                    grid: { display: false }
+                                }
+                            }
+                        }
+                    });
+
+                    // Price Hype Trend Line Chart
+                    const priceHypeCtx = document.getElementById('priceHypeChart').getContext('2d');
+                    new Chart(priceHypeCtx, {
+                        type: 'line',
+                        data: {
+                            labels: data.news_items.map(item => item.index),
+                            datasets: [{
+                                label: 'Price Hype Indicator',
+                                data: data.price_hype,
+                                borderColor: '#00f0ff',
+                                backgroundColor: 'rgba(0, 240, 255, 0.2)',
+                                borderWidth: 3,
+                                pointRadius: 4,
+                                tension: 0.3,
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                title: {
+                                    display: true,
+                                    text: 'Price Hype Trend Based on Sentiment',
+                                    font: { size: 18, weight: 'bold' },
+                                    color: '#ffffff',
+                                    padding: { bottom: 20 }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `Hype Score: ${context.raw.toFixed(2)}`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: false,
+                                    ticks: { color: '#cccccc', font: { size: 12 } },
+                                    grid: { color: 'rgba(255,255,255,0.1)' }
+                                },
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'News Item Index',
+                                        color: '#ffffff',
+                                        font: { size: 14 }
+                                    },
+                                    ticks: { color: '#cccccc', font: { size: 12 } },
+                                    grid: { display: false }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching sentiment data:', error);
+                    loadingDiv.style.display = 'none';
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = `Failed to load sentiment data: ${error.message}. Check the console for details.`;
+                    sentimentContent.style.display = 'none';
+                });
+        }
+
+        window.onload = () => {
+            fetchSentimentData();
+        };
+    </script>
+</body>
+</html>
