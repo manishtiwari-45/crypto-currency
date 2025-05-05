@@ -1,45 +1,24 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🚀 Full-Screen Crypto Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+{% extends "layout.html" %}
+
+{% block content %}
   <style>
-    body {
-      background: linear-gradient(145deg, #1A1A1A 0%, #2A2A2A 100%);
-      position: relative;
-      min-height: 100vh;
-      margin: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    body::before {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAMAAABHPGVmAAAAA1BMVEX///+nxBvIAAAAIElEQVR4nO3BgQAAAADDoPlT3+AAVqIQAAAC8ADwAADA4gGqYcE2rwAAAABJRU5ErkJggg==') repeat;
-      opacity: 0.05;
-      pointer-events: none;
-      z-index: -1;
-    }
     .fullscreen-container {
-      background-color: #2A2A2A;
+      background: rgba(30, 30, 46, 0.8);
       padding: 25px;
-      border-radius: 15px;
-      min-height: 100vh;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     }
     .header {
-      background-color: transparent;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 0;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #ffffff15;
     }
     .header h1 {
-      font-size: 2rem;
+      font-size: 28px;
+      font-weight: 700;
+      color: #ffffff;
     }
     .header form {
       display: flex;
@@ -49,8 +28,9 @@
       padding: 10px;
       border-radius: 5px;
       border: 1px solid #444;
-      background: #333;
-      color: #fff;
+      background: #2a2a3a;
+      color: #e0e0e0;
+      font-size: 14px;
     }
     .header button {
       padding: 10px 20px;
@@ -59,35 +39,40 @@
       border-radius: 5px;
       color: #fff;
       cursor: pointer;
+      font-size: 14px;
+      transition: background 0.3s ease;
+    }
+    .header button:hover {
+      background: #e09900;
     }
     .coin-info {
-      background-color: #25293b;
-      padding: 15px;
+      background: rgba(40, 40, 60, 0.9);
+      padding: 20px;
       border-radius: 10px;
+      margin-top: 20px;
     }
-    .info-card, .stat-card, .chart-container, .news-container, .crypto-box, .ier-container {
-      background: linear-gradient(145deg, #1e2a44 0%, #3b1e44 100%);
+    .info-card, .stat-card, .chart-container, .news-container, .crypto-box, .ier-container, .simulator-container {
+      background: rgba(50, 50, 70, 0.9);
       border: 1px solid #ffffff15;
-      box-shadow: 0 6px 15px rgba(0,0,0,0.3);
-    }
-    .info-card {
-      padding: 25px;
-      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 20px;
     }
     .info-card h2 {
       color: #ffffff;
-      font-size: 28px;
+      font-size: 26px;
       margin-bottom: 15px;
     }
     .info-card .price {
       color: #00f0ff;
-      font-size: 34px;
+      font-size: 32px;
       font-weight: bold;
       margin: 10px 0;
-      text-shadow: 0 0 8px rgba(0,240,255,0.5);
+      text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
     }
     .info-card .change {
-      font-size: 20px;
+      font-size: 18px;
       font-weight: bold;
     }
     .info-card .change.positive {
@@ -98,30 +83,38 @@
     }
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 15px;
+      margin-top: 20px;
     }
     .stat-card {
       padding: 15px;
       border-radius: 8px;
     }
     .stat-card .stat-label {
-      color: #cccccc;
+      color: #a0a0a0;
       font-size: 14px;
     }
     .stat-card .stat-value {
-      color: #ffffff;
+      color: #e0e0e0;
       font-size: 16px;
+      margin-top: 5px;
+    }
+    .stat-card .stat-value a {
+      color: #f2a900;
+      text-decoration: none;
+    }
+    .stat-card .stat-value a:hover {
+      text-decoration: underline;
     }
     .chart-container {
-      padding: 20px;
-      border-radius: 10px;
       height: 400px !important;
       position: relative;
     }
-    .news-container {
-      padding: 20px;
-      border-radius: 10px;
+    .news-container h3, .top-10-container h2, .ier-container h3, .simulator-container h3 {
+      color: #ffffff;
+      font-size: 22px;
+      margin-bottom: 15px;
     }
     .news-list {
       list-style: none;
@@ -131,15 +124,15 @@
       border-bottom: 1px solid #ffffff15;
     }
     .news-list a {
-      color: #ffffff;
+      color: #e0e0e0;
       text-decoration: none;
+      transition: color 0.3s ease;
     }
     .news-list a:hover {
       color: #f2a900;
     }
     .top-10-container {
       margin-top: 25px;
-      background-color: transparent;
     }
     .crypto-grid {
       display: grid;
@@ -147,8 +140,6 @@
       gap: 20px;
     }
     .crypto-box {
-      padding: 20px;
-      border-radius: 15px;
       transition: transform 0.3s ease, box-shadow 0.3s ease;
       opacity: 0;
       animation: fadeIn 0.5s ease forwards;
@@ -156,7 +147,7 @@
     }
     .crypto-box:hover {
       transform: translateY(-5px);
-      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
     }
     .crypto-header {
       display: flex;
@@ -176,7 +167,7 @@
     }
     .crypto-rank {
       font-size: 14px;
-      color: #aaaaaa;
+      color: #a0a0a0;
     }
     .crypto-price {
       font-size: 18px;
@@ -199,13 +190,7 @@
       width: 100% !important;
     }
     .ier-container {
-      padding: 20px;
-      border-radius: 10px;
       margin-top: 20px;
-    }
-    .ier-container h3 {
-      color: #ffffff;
-      margin-bottom: 15px;
     }
     .ier-gauge {
       position: relative;
@@ -214,7 +199,7 @@
     }
     .ier-details {
       margin-top: 15px;
-      color: #cccccc;
+      color: #a0a0a0;
     }
     .ier-details p {
       margin: 5px 0;
@@ -234,19 +219,50 @@
     .ier-label.undervalued {
       color: #00ff85;
     }
-    h1, h2, h3 {
-      color: #ffffff;
+    .simulator-container {
+      margin-top: 20px;
     }
-    p, a {
-      color: #cccccc;
+    .simulator-form {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
     }
-    .error {
-      color: #ff5555;
-      text-align: center;
-      padding: 15px;
-      background: #3a1e1e;
+    .simulator-form input[type="date"],
+    .simulator-form input[type="number"],
+    .simulator-form select {
+      padding: 10px;
       border-radius: 5px;
-      margin: 15px 0;
+      border: 1px solid #444;
+      background: #2a2a3a;
+      color: #e0e0e0;
+      font-size: 14px;
+    }
+    .simulator-form button {
+      padding: 10px 20px;
+      background: #f2a900;
+      border: none;
+      border-radius: 5px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.3s ease;
+    }
+    .simulator-form button:hover {
+      background: #e09900;
+    }
+    .simulator-results {
+      margin-top: 15px;
+      color: #a0a0a0;
+    }
+    .simulator-results p {
+      margin: 5px 0;
+    }
+    .profit-loss.positive {
+      color: #00ff85;
+    }
+    .profit-loss.negative {
+      color: #ff3366;
     }
     .loading {
       display: none;
@@ -259,7 +275,7 @@
       text-align: center;
     }
     .placeholder {
-      color: #cccccc;
+      color: #a0a0a0;
       text-align: center;
       padding: 20px;
     }
@@ -273,6 +289,8 @@
       color: #fff;
       text-decoration: none;
       cursor: pointer;
+      font-size: 14px;
+      transition: background 0.3s ease;
     }
     .correlation-button:hover {
       background: #e09900;
@@ -282,13 +300,12 @@
       to { opacity: 1; transform: translateY(0); }
     }
   </style>
-</head>
-<body>
+
   <div class="fullscreen-container">
     <div class="header">
       <h1>Crypto Dashboard</h1>
       <form method="POST">
-        <input type="text" name="coin" placeholder="e.g. ethereum" required>
+        <input type="text" name="coin" placeholder="e.g. Ethereum" required>
         <button type="submit">Fetch</button>
       </form>
     </div>
@@ -330,7 +347,7 @@
         </div>
 
         <div class="chart-container">
-          <select id="timeRangeSelect" style="margin-bottom: 15px; padding: 5px; border-radius: 5px; background: #333; color: #fff; border: 1px solid #444;">
+          <select id="timeRangeSelect" style="margin-bottom: 15px; padding: 8px; border-radius: 5px; background: #2a2a3a; color: #e0e0e0; border: 1px solid #444;">
             <option value="30">1 Month</option>
             <option value="180">6 Months</option>
             <option value="365" selected>1 Year</option>
@@ -359,28 +376,49 @@
         </div>
         {% endif %}
 
-        <div class="news-container">
-          <h3>Latest Crypto News</h3>
-          <div id="newsList" class="placeholder">Loading news...</div>
+        <div class="simulator-container">
+          <h3>"What If I Invested..." Simulator</h3>
+          <form method="POST" class="simulator-form">
+            <input type="hidden" name="coin" value="{{ coin.name }}">
+            <input type="date" name="investment_date" max="2025-05-04" required
+                   value="{{ sim_start_date if sim_start_date else '2024-05-05' }}">
+            <input type="number" name="investment_amount" placeholder="Amount ($)" min="1" step="0.01" required
+                   value="{{ sim_amount if sim_amount else '1000' }}">
+            <select name="investment_type">
+              <option value="lump_sum" {% if sim_type == 'lump_sum' %}selected{% endif %}>Lump Sum</option>
+              <option value="dca" {% if sim_type == 'dca' %}selected{% endif %}>Dollar-Cost Averaging (DCA)</option>
+            </select>
+            <button type="submit">Simulate</button>
+          </form>
+          {% if sim_error %}
+            <p class="error">{{ sim_error }}</p>
+          {% elif sim_final_value is not none %}
+            <div class="simulator-results">
+              <p>Investment Date: {{ sim_start_date }}</p>
+              <p>Investment Amount: ${{ "{:,.2f}".format(sim_amount|float) }}</p>
+              <p>Investment Type: {{ 'Lump Sum' if sim_type == 'lump_sum' else 'Dollar-Cost Averaging (DCA)' }}</p>
+              <p>Final Value (as of May 05, 2025): ${{ "{:,.2f}".format(sim_final_value) }}</p>
+              <p class="profit-loss {% if sim_profit_loss >= 0 %}positive{% else %}negative{% endif %}">
+                Profit/Loss: ${{ "{:,.2f}".format(sim_profit_loss) }} ({{ "%.2f"|format(sim_profit_loss_percent) }}%)
+              </p>
+            </div>
+          {% endif %}
         </div>
-
-        <div class="top-10-container">
-          <h2>Top 10 Cryptocurrencies</h2>
-          <div id="cryptoGrid" class="crypto-grid placeholder">Loading top 10 cryptocurrencies...</div>
-        </div>
-      </div>
-    {% else %}
-      <div class="news-container">
-        <h3>Latest Crypto News</h3>
-        <div id="newsList" class="placeholder">Loading news...</div>
-      </div>
-      <div class="top-10-container">
-        <h2>Top 10 Cryptocurrencies</h2>
-        <div id="cryptoGrid" class="crypto-grid placeholder">Loading top 10 cryptocurrencies...</div>
       </div>
     {% endif %}
+
+    <div class="top-10-container">
+      <h2>Top 10 Cryptocurrencies</h2>
+      <div id="cryptoGrid" class="crypto-grid placeholder">Loading top 10 cryptocurrencies...</div>
+    </div>
+
+    <div class="news-container">
+      <h3>Latest Crypto News</h3>
+      <div id="newsList" class="placeholder">Loading news...</div>
+    </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script>
     function fetchNews() {
       fetch('/get_news')
@@ -464,8 +502,8 @@
     }
 
     window.onload = () => {
-      fetchNews();
       fetchTop10();
+      fetchNews();
     };
 
     {% if coin %}
@@ -577,12 +615,10 @@
     const ierCtx = document.getElementById('ierGauge').getContext('2d');
     const ierValue = {{ ier|tojson|safe }};
 
-    // Normalize IER for the gauge (cap at 10 for visualization)
     const maxIerForGauge = 10;
     const normalizedIer = Math.min(ierValue, maxIerForGauge);
-    const gaugeValue = (normalizedIer / maxIerForGauge) * 180; // Map to 0-180 degrees
+    const gaugeValue = (normalizedIer / maxIerForGauge) * 180;
 
-    // Determine label and color
     let label = '';
     let needleColor = '';
     if (ierValue < 1.5) {
@@ -624,5 +660,4 @@
     {% endif %}
     {% endif %}
   </script>
-</body>
-</html>
+{% endblock %}

@@ -1,0 +1,372 @@
+{% extends "layout.html" %}
+
+{% block content %}
+  <style>
+    .sentiment-container {
+      background: rgba(30, 30, 46, 0.8);
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #ffffff15;
+      margin-bottom: 20px;
+    }
+    .header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .back-button {
+      padding: 10px 20px;
+      background: #f2a900;
+      border: none;
+      border-radius: 5px;
+      color: #fff;
+      text-decoration: none;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.3s ease;
+    }
+    .back-button:hover {
+      background: #e09900;
+    }
+    .sentiment-summary {
+      background: rgba(50, 50, 70, 0.9);
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-around;
+      text-align: center;
+    }
+    .sentiment-summary div {
+      flex: 1;
+    }
+    .sentiment-summary .label {
+      font-size: 16px;
+      color: #a0a0a0;
+      margin-bottom: 5px;
+    }
+    .sentiment-summary .value {
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .sentiment-summary .positive {
+      color: #00ff85;
+    }
+    .sentiment-summary .negative {
+      color: #ff3366;
+    }
+    .sentiment-summary .neutral {
+      color: #f2a900;
+    }
+    .chart-container {
+      background: rgba(50, 50, 70, 0.9);
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+    .chart-container canvas {
+      width: 100% !important;
+      height: 300px !important;
+    }
+    .insights-container {
+      background: rgba(50, 50, 70, 0.9);
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+    .insights-container h3 {
+      color: #ffffff;
+      font-size: 22px;
+      margin-bottom: 15px;
+    }
+    .insights-container p {
+      font-size: 16px;
+      color: #a0a0a0;
+      margin: 10px 0;
+    }
+    .insights-container .highlight {
+      color: #f2a900;
+      font-weight: bold;
+    }
+    .news-list-container {
+      background: rgba(50, 50, 70, 0.9);
+      padding: 20px;
+      border-radius: 10px;
+    }
+    .news-list-container h2 {
+      color: #ffffff;
+      font-size: 22px;
+      margin-bottom: 15px;
+    }
+    .news-list {
+      list-style: none;
+    }
+    .news-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 0;
+      border-bottom: 1px solid #ffffff15;
+    }
+    .news-item:last-child {
+      border-bottom: none;
+    }
+    .news-title a {
+      color: #e0e0e0;
+      text-decoration: none;
+      font-size: 16px;
+      transition: color 0.3s ease;
+    }
+    .news-title a:hover {
+      color: #f2a900;
+    }
+    .sentiment-info {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+    .sentiment-label {
+      font-size: 14px;
+      font-weight: bold;
+      padding: 5px 10px;
+      border-radius: 5px;
+      text-transform: capitalize;
+    }
+    .sentiment-label.positive {
+      background: #00ff8520;
+      color: #00ff85;
+    }
+    .sentiment-label.negative {
+      background: #ff336620;
+      color: #ff3366;
+    }
+    .sentiment-label.neutral {
+      background: #f2a90020;
+      color: #f2a900;
+    }
+    .sentiment-score {
+      font-size: 14px;
+      color: #a0a0a0;
+    }
+  </style>
+
+  <div class="sentiment-container">
+    <div class="header">
+      <h1>News & Sentiment Analysis</h1>
+      <a href="{{ url_for('index') }}" class="back-button">Back to Dashboard</a>
+    </div>
+
+    {% if error %}
+      <p class="error">{{ error }}</p>
+    {% else %}
+      <div class="sentiment-summary">
+        <div>
+          <div class="label">Positive</div>
+          <div class="value positive">{{ sentiment_counts.positive }}</div>
+        </div>
+        <div>
+          <div class="label">Negative</div>
+          <div class="value negative">{{ sentiment_counts.negative }}</div>
+        </div>
+        <div>
+          <div class="label">Neutral</div>
+          <div class="value neutral">{{ sentiment_counts.neutral }}</div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <h3>Sentiment Distribution</h3>
+        <canvas id="sentimentPieChart"></canvas>
+      </div>
+
+      <div class="chart-container">
+        <h3>Investor Impact Analysis</h3>
+        <canvas id="investorImpactChart"></canvas>
+      </div>
+
+      <div class="chart-container">
+        <h3>Price Hype Trend</h3>
+        <canvas id="priceHypeChart"></canvas>
+      </div>
+
+      <div class="insights-container">
+        <h3>Market Insights</h3>
+        <p>Average Sentiment Score: <span class="highlight">{{ avg_polarity }}</span></p>
+        <p>{{ summary }}</p>
+      </div>
+
+      <div class="news-list-container">
+        <h2>Latest Crypto News Headlines</h2>
+        <ul class="news-list">
+          {% for item in news_items %}
+            <li class="news-item">
+              <div class="news-title">
+                <a href="{{ item.link }}" target="_blank">{{ item.title }}</a>
+              </div>
+              <div class="sentiment-info">
+                <span class="sentiment-label {{ item.sentiment }}">{{ item.sentiment }}</span>
+                <span class="sentiment-score">Score: {{ item.polarity }}</span>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if not error %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script>
+    // Sentiment Distribution Pie Chart
+    const sentimentPieCtx = document.getElementById('sentimentPieChart').getContext('2d');
+    new Chart(sentimentPieCtx, {
+      type: 'pie',
+      data: {
+        labels: ['Positive', 'Negative', 'Neutral'],
+        datasets: [{
+          data: [{{ sentiment_counts.positive }}, {{ sentiment_counts.negative }}, {{ sentiment_counts.neutral }}],
+          backgroundColor: ['#00ff85', '#ff3366', '#f2a900'],
+          borderWidth: 1,
+          borderColor: '#ffffff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              color: '#e0e0e0',
+              font: { size: 14 }
+            }
+          },
+          title: {
+            display: true,
+            text: 'Sentiment Distribution of Latest News',
+            font: { size: 18, weight: 'bold' },
+            color: '#ffffff',
+            padding: { bottom: 20 }
+          }
+        }
+      }
+    });
+
+    // Investor Impact Bar Chart
+    const investorImpactCtx = document.getElementById('investorImpactChart').getContext('2d');
+    new Chart(investorImpactCtx, {
+      type: 'bar',
+      data: {
+        labels: ['Confidence', 'Risk', 'Stability'],
+        datasets: [{
+          label: 'Impact Score',
+          data: [
+            {{ investor_impact.confidence }},
+            {{ investor_impact.risk }},
+            {{ investor_impact.stability }}
+          ],
+          backgroundColor: ['#00ff85', '#ff3366', '#f2a900'],
+          borderWidth: 1,
+          borderColor: '#ffffff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: {
+            display: true,
+            text: 'Potential Impact on Investors',
+            font: { size: 18, weight: 'bold' },
+            color: '#ffffff',
+            padding: { bottom: 20 }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return `${context.label}: ${context.raw} points`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#cccccc', font: { size: 12 } },
+            grid: { color: 'rgba(255,255,255,0.1)' }
+          },
+          x: {
+            ticks: { color: '#cccccc', font: { size: 12 } },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+
+    // Price Hype Trend Line Chart
+    const priceHypeCtx = document.getElementById('priceHypeChart').getContext('2d');
+    new Chart(priceHypeCtx, {
+      type: 'line',
+      data: {
+        labels: {{ news_items|map(attribute='index')|list|tojson|safe }},
+        datasets: [{
+          label: 'Price Hype Indicator',
+          data: {{ price_hype|tojson|safe }},
+          borderColor: '#00f0ff',
+          backgroundColor: 'rgba(0, 240, 255, 0.2)',
+          borderWidth: 3,
+          pointRadius: 4,
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: {
+            display: true,
+            text: 'Price Hype Trend Based on Sentiment',
+            font: { size: 18, weight: 'bold' },
+            color: '#ffffff',
+            padding: { bottom: 20 }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return `Hype Score: ${context.raw.toFixed(2)}`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            ticks: { color: '#cccccc', font: { size: 12 } },
+            grid: { color: 'rgba(255,255,255,0.1)' }
+          },
+          x: {
+            title: {
+              display: true,
+              text: 'News Item Index',
+              color: '#ffffff',
+              font: { size: 14 }
+            },
+            ticks: { color: '#cccccc', font: { size: 12 } },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  </script>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Insights</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .navbar {
+      background: rgba(30, 30, 46, 0.95);
+      padding: 15px 30px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .navbar .logo {
+      font-size: 24px;
+      font-weight: 700;
+      color: #00f0ff;
+      text-decoration: none;
+    }
+    .navbar .nav-links {
+      display: flex;
+      gap: 20px;
+    }
+    .navbar .nav-links a {
+      color: #e0e0e0;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 400;
+      transition: color 0.3s ease;
+    }
+    .navbar .nav-links a:hover {
+      color: #f2a900;
+    }
+    .container {
+      flex: 1;
+      max-width: 1200px;
+      margin: 30px auto;
+      padding: 20px;
+    }
+    .footer {
+      background: rgba(30, 30, 46, 0.95);
+      padding: 15px;
+      text-align: center;
+      font-size: 14px;
+      color: #a0a0a0;
+      border-top: 1px solid #ffffff15;
+    }
+    .error {
+      color: #ff5555;
+      text-align: center;
+      padding: 15px;
+      background: #3a1e1e;
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a href="{{ url_for('index') }}" class="logo">Crypto Insights</a>
+    <div class="nav-links">
+      <a href="{{ url_for('index') }}">Dashboard</a>
+      <a href="{{ url_for('sentiment_analysis') }}">News & Sentiment</a>
+    </div>
+  </nav>
+  
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+
+  <footer class="footer">
+    © 2025 Crypto Insights. All rights reserved.
+  </footer>
+</body>
+</html>

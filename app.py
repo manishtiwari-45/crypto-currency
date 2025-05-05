@@ -6,6 +6,8 @@ import feedparser
 import pandas as pd
 import numpy as np
 import logging
+from textblob import TextBlob
+import nltk
 
 app = Flask(__name__)
 API_URL = "https://api.coingecko.com/api/v3/"
@@ -20,6 +22,13 @@ CSV_DATA_FILE = 'top10_crypto_1hr_1year11.csv'
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+try:
+    nltk.download('punkt', quiet=True)
+    nltk.download('averaged_perceptron_tagger', quiet=True)
+    nltk.download('brown', quiet=True)
+except Exception as e:
+    logger.error(f"Error downloading NLTK data: {e}")
 
 try:
     csv_data = pd.read_csv(CSV_DATA_FILE)
@@ -133,18 +142,44 @@ def get_historical_data_from_csv(symbol, days=365):
         logger.warning("CSV data is empty")
     return [], []
 
+def get_historical_data_with_dates(coin_id, start_date, end_date):
+    try:
+        days = (end_date - start_date).days
+        if days < 1:
+            return [], [], "Start date must be before end date"
+        
+        resp = requests.get(f"{API_URL}coins/{coin_id.lower()}/market_chart",
+                          params={'vs_currency': 'usd', 'days': days, 'interval': 'daily'},
+                          headers=HEADERS)
+        resp.raise_for_status()
+        hist = resp.json()['prices']
+        
+        dates = [datetime.fromtimestamp(ts/1000).date() for ts, _ in hist]
+        prices = [price for _, price in hist]
+        
+        filtered_dates = []
+        filtered_prices = []
+        for date, price in zip(dates, prices):
+            if start_date.date() <= date <= end_date.date():
+                filtered_dates.append(date)
+                filtered_prices.append(price)
+        
+        logger.info(f"Fetched API data for {coin_id}, from {start_date} to {end_date}: {len(filtered_dates)} points")
+        return filtered_dates, filtered_prices, None
+    except Exception as e:
+        logger.error(f"Error fetching historical data for {coin_id}: {e}")
+        return [], [], "Error fetching historical data"
+
 def calculate_ier(values, initial_investment=1000):
     try:
         if not values or len(values) < 2:
             return 0, 0, 0, "Insufficient data for IER calculation"
 
-        # Calculate portfolio value over time based on initial investment
         initial_price = values[0]
         shares = initial_investment / initial_price
         portfolio_values = [price * shares for price in values]
         final_portfolio_value = portfolio_values[-1]
 
-        # Calculate max drawdown
         peak = portfolio_values[0]
         trough = portfolio_values[0]
         max_drawdown = 0
@@ -157,7 +192,6 @@ def calculate_ier(values, initial_investment=1000):
             if drawdown > max_drawdown:
                 max_drawdown = drawdown
 
-        # Avoid division by zero
         if max_drawdown == 0:
             return final_portfolio_value, max_drawdown, float('inf'), "No drawdown detected"
 
@@ -167,7 +201,53 @@ def calculate_ier(values, initial_investment=1000):
         logger.error(f"Error calculating IER: {e}")
         return 0, 0, 0, "Error calculating IER"
 
-def get_correlation_data(coin_id, days=365):
+def calculate_investment_simulation(coin_id, start_date_str, amount, investment_type):
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+        end_date = datetime.strptime('2025-05-05', '%Y-%m-%d')
+        if start_date >= end_date:
+            return None, None, None, "Start date must be before May 05, 2025"
+
+        dates, prices, error = get_historical_data_with_dates(coin_id, start_date, end_date)
+        if error or not dates or not prices:
+            return None, None, None, error or "No data available for the selected period"
+
+        amount = float(amount)
+        if investment_type == 'lump_sum':
+            shares = amount / prices[0]
+            final_value = shares * prices[-1]
+            profit_loss = final_value - amount
+            profit_loss_percent = (profit_loss / amount) * 100
+        else:  # DCA
+            days = (end_date - start_date).days
+            if days < 30:
+                return None, None, None, "DCA requires at least 30 days of data"
+            
+            monthly_investment = amount / (days // 30)
+            shares = 0
+            investment_dates = []
+            current_date = start_date
+            while current_date <= end_date:
+                investment_dates.append(current_date.date())
+                current_date += timedelta(days=30)
+            
+            total_invested = 0
+            for inv_date in investment_dates:
+                closest_date_idx = min(range(len(dates)), key=lambda i: abs((dates[i] - inv_date).days))
+                price = prices[closest_date_idx]
+                shares += monthly_investment / price
+                total_invested += monthly_investment
+            
+            final_value = shares * prices[-1]
+            profit_loss = final_value - total_invested
+            profit_loss_percent = (profit_loss / total_invested) * 100
+
+        return final_value, profit_loss, profit_loss_percent, None
+    except Exception as e:
+        logger.error(f"Error in investment simulation: {e}")
+        return None, None, None, "Error calculating investment simulation"
+
+def calculate_correlation_data(coin_id, days=365):
     try:
         top_10_df = get_scraped_data()
         if top_10_df is None:
@@ -213,16 +293,16 @@ def get_correlation_data(coin_id, days=365):
         
         if price_df.empty or len(price_df.columns) < 2:
             return [], [], "Insufficient data for correlation analysis"
-        
+
         price_df = price_df.dropna(how='all')
         price_df = price_df.ffill()
-        
+
         returns_df = price_df.pct_change().dropna()
         logger.info(f"Returns DataFrame shape: {returns_df.shape}")
-        
+
         if len(returns_df) < 10:
             return [], [], f"Not enough overlapping data points ({len(returns_df)}) to compute correlation"
-        
+
         corr_matrix = returns_df.corr().round(2)
         labels = list(corr_matrix.columns)
         matrix_data = []
@@ -254,26 +334,107 @@ def scrape_crypto_news():
             '.article-card h6'
         ]
         for selector in selectors:
-            articles = soup.select(selector)[:6]
+            articles = soup.select(selector)[:10]
             if articles:
-                for article in articles:
+                for idx, article in enumerate(articles):
                     title = article.text.strip()
                     link = article.find_parent('a')['href'] if article.find_parent('a') else '#'
                     if not link.startswith('http'):
                         link = f"https://www.coindesk.com{link}"
-                    news_items.append({'title': title, 'link': link})
+                    analysis = TextBlob(title)
+                    polarity = analysis.sentiment.polarity
+                    if polarity > 0:
+                        sentiment = 'positive'
+                    elif polarity < 0:
+                        sentiment = 'negative'
+                    else:
+                        sentiment = 'neutral'
+                    news_items.append({
+                        'title': title,
+                        'link': link,
+                        'sentiment': sentiment,
+                        'polarity': round(polarity, 2),
+                        'index': idx
+                    })
                 break
         if not news_items:
             feed = feedparser.parse("https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml")
-            news_items = [{'title': e.title, 'link': e.link} for e in feed.entries[:6]]
-        return news_items[:6]
+            for idx, entry in enumerate(feed.entries[:10]):
+                title = entry.title
+                analysis = TextBlob(title)
+                polarity = analysis.sentiment.polarity
+                if polarity > 0:
+                    sentiment = 'positive'
+                elif polarity < 0:
+                    sentiment = 'negative'
+                else:
+                    sentiment = 'neutral'
+                news_items.append({
+                    'title': title,
+                    'link': entry.link,
+                    'sentiment': sentiment,
+                    'polarity': round(polarity, 2),
+                    'index': idx
+                })
+        return news_items[:10]
     except Exception as e:
         logger.error(f"Web scraping error: {e}")
         try:
             feed = feedparser.parse("https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml")
-            return [{'title': e.title, 'link': e.link} for e in feed.entries[:6]]
+            news_items = []
+            for idx, entry in enumerate(feed.entries[:10]):
+                title = entry.title
+                analysis = TextBlob(title)
+                polarity = analysis.sentiment.polarity
+                if polarity > 0:
+                    sentiment = 'positive'
+                elif polarity < 0:
+                    sentiment = 'negative'
+                else:
+                    sentiment = 'neutral'
+                news_items.append({
+                    'title': title,
+                    'link': entry.link,
+                    'sentiment': sentiment,
+                    'polarity': round(polarity, 2),
+                    'index': idx
+                })
+            return news_items[:10]
         except:
             return []
+
+def analyze_sentiment_impact(news_items):
+    sentiment_counts = {'positive': 0, 'negative': 0, 'neutral': 0}
+    polarities = []
+    for item in news_items:
+        sentiment_counts[item['sentiment']] += 1
+        polarities.append(item['polarity'])
+    
+    avg_polarity = sum(polarities) / len(polarities) if polarities else 0
+    sentiment_trend = polarities
+    investor_impact = {
+        'confidence': sum(1 for p in polarities if p > 0) * 10,
+        'risk': sum(1 for p in polarities if p < 0) * 15,
+        'stability': sum(1 for p in polarities if p == 0) * 5
+    }
+    price_hype = [p * 100 for p in polarities]
+    
+    summary = "Market sentiment is "
+    if avg_polarity > 0.1:
+        summary += "bullish, likely increasing investor confidence and driving price hype."
+    elif avg_polarity < -0.1:
+        summary += "bearish, potentially increasing perceived risk and dampening price momentum."
+    else:
+        summary += "neutral, suggesting stable but unexciting market conditions."
+    
+    return {
+        'sentiment_counts': sentiment_counts,
+        'avg_polarity': round(avg_polarity, 2),
+        'sentiment_trend': sentiment_trend,
+        'investor_impact': investor_impact,
+        'price_hype': price_hype,
+        'summary': summary
+    }
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -286,6 +447,13 @@ def index():
     max_drawdown = None
     ier = None
     ier_error = None
+    sim_final_value = None
+    sim_profit_loss = None
+    sim_profit_loss_percent = None
+    sim_error = None
+    sim_start_date = None
+    sim_amount = None
+    sim_type = None
 
     if request.method == "POST":
         coin_name = request.form["coin"].strip().lower()
@@ -320,6 +488,15 @@ def index():
                     final_portfolio_value, max_drawdown, ier, ier_error = calculate_ier(values)
                 else:
                     error = f"Could not fetch data for '{coin_name}'. Please check the name and try again."
+            
+            if "investment_date" in request.form and "investment_amount" in request.form:
+                sim_start_date = request.form["investment_date"]
+                sim_amount = request.form["investment_amount"]
+                sim_type = request.form.get("investment_type", "lump_sum")
+                if coin_id:
+                    sim_final_value, sim_profit_loss, sim_profit_loss_percent, sim_error = calculate_investment_simulation(
+                        coin_id, sim_start_date, sim_amount, sim_type
+                    )
         else:
             error = "Please enter a coin name"
 
@@ -333,7 +510,33 @@ def index():
         final_portfolio_value=final_portfolio_value,
         max_drawdown=max_drawdown,
         ier=ier,
-        ier_error=ier_error
+        ier_error=ier_error,
+        sim_final_value=sim_final_value,
+        sim_profit_loss=sim_profit_loss,
+        sim_profit_loss_percent=sim_profit_loss_percent,
+        sim_error=sim_error,
+        sim_start_date=sim_start_date,
+        sim_amount=sim_amount,
+        sim_type=sim_type
+    )
+
+@app.route("/sentiment_analysis")
+def sentiment_analysis():
+    news_items = scrape_crypto_news()
+    if not news_items:
+        error = "Could not fetch news for sentiment analysis."
+        return render_template("sentiment_analysis.html", error=error)
+    
+    analysis = analyze_sentiment_impact(news_items)
+    return render_template(
+        "sentiment_analysis.html",
+        news_items=news_items,
+        sentiment_counts=analysis['sentiment_counts'],
+        avg_polarity=analysis['avg_polarity'],
+        sentiment_trend=analysis['sentiment_trend'],
+        investor_impact=analysis['investor_impact'],
+        price_hype=analysis['price_hype'],
+        summary=analysis['summary']
     )
 
 @app.route("/correlation/<coin_id>")
@@ -342,7 +545,7 @@ def correlation(coin_id):
     if not coin:
         return render_template("correlation.html", error=f"Could not fetch data for coin ID: {coin_id}", coin_id=coin_id)
     
-    matrix_data, labels, error = get_correlation_data(coin_id)
+    matrix_data, labels, error = calculate_correlation_data(coin_id)
     return render_template(
         "correlation.html",
         coin=coin,
