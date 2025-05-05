@@ -610,4 +610,4 @@ def api_historical_data(coin_id, days):
         return jsonify({'error': 'Failed to fetch historical data'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', debug=True)
